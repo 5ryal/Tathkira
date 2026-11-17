@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tathkira — ticket review</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --ink: #1c1b19;
+    --muted: #6b6862;
+    --line: #ddd9d2;
+    --accent: #0f6b5f;
+    --danger: #a3271f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 15px; margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  h3 { font-size: 13px; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .sub { margin: 0 0 28px; color: var(--muted); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label { display: block; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  input, textarea {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fdfcfa;
+    color: var(--ink);
+    font: inherit;
+    font-weight: 400;
+  }
+  textarea { resize: vertical; }
+  input:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  #request { font-size: 18px; }
+  .row { display: flex; gap: 10px; margin-top: 4px; }
+  button {
+    padding: 10px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .error {
+    margin: 0 0 20px;
+    padding: 12px 14px;
+    border: 1px solid #e5c3bf;
+    border-left: 4px solid var(--danger);
+    border-radius: 7px;
+    background: #fdf1f0;
+    color: var(--danger);
+    font-weight: 600;
+  }
+  #gaps { margin: 0; padding-left: 20px; }
+  #gaps li { margin-bottom: 8px; }
+  #gaps .note { color: var(--muted); }
+  #gaps .empty { list-style: none; margin-left: -20px; color: var(--muted); }
+  mark { background: #fdf0c8; padding: 0 2px; }
+  #tickets { margin: 0; padding: 0; list-style: none; }
+  #tickets li { padding: 14px 0; border-top: 1px solid var(--line); }
+  #tickets li:first-child { border-top: 0; }
+  .ticket-title { font-weight: 700; }
+  .meta { margin-top: 4px; font-size: 13px; color: var(--muted); }
+  .badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 20px;
+    background: #e7f1ef;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .criteria { margin: 8px 0 0; padding-left: 18px; font-size: 14px; color: #3c3a36; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tathkira</h1>
+  <p class="sub">Turn an informal Arabic request into a developer ticket. Nothing is saved until you approve it.</p>
+
+  <section class="panel">
+    <h2>1. Request</h2>
+    <label for="request">What do you need?</label>
+    <textarea id="request" dir="rtl" rows="4" placeholder="اكتب طلبك هنا"></textarea>
+    <div class="row">
+      <button id="generate">Generate ticket</button>
+    </div>
+  </section>
+
+  <p id="error" class="error" hidden></p>
+
+  <section id="review" class="panel" hidden>
+    <h2>2. Review</h2>
+    <label for="title">Title
+      <input id="title" type="text">
+    </label>
+    <label for="description">Description
+      <textarea id="description" rows="3"></textarea>
+    </label>
+    <label for="criteria">Acceptance criteria (one per line)
+      <textarea id="criteria" rows="4"></textarea>
+    </label>
+    <h3>Gaps</h3>
+    <ul id="gaps"></ul>
+    <div class="row">
+      <button id="approve">Approve</button>
+      <button id="reject" class="secondary">Reject</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Approved tickets</h2>
+    <ul id="tickets"></ul>
+  </section>
+</main>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  let draft = null;
+
+  function showError(message) {
+    el("error").textContent = message;
+    el("error").hidden = !message;
+  }
+
+  async function postJson(url, body) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.detail || "Request failed");
+    }
+    return data;
+  }
+
+  function renderGaps(gaps) {
+    const list = el("gaps");
+    list.replaceChildren();
+    if (gaps.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "empty";
+      empty.textContent = "No vague phrases found.";
+      list.appendChild(empty);
+      return;
+    }
+    for (const gap of gaps) {
+      const item = document.createElement("li");
+      if (gap.kind === "assumed") {
+        item.textContent = gap.source_phrase + " \u2192 " + gap.requirement;
+      } else {
+        const mark = document.createElement("mark");
+        mark.textContent = gap.source_phrase;
+        item.appendChild(mark);
+      }
+      const note = document.createElement("span");
+      note.className = "note";
+      note.textContent = " " + gap.note;
+      item.appendChild(note);
+      list.appendChild(item);
+    }
+  }
+
+  function currentTicket() {
+    return {
+      title: el("title").value,
+      description: el("description").value,
+      acceptance_criteria: el("criteria")
+        .value.split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+    };
+  }
+
+  function isEdited() {
+    if (!draft) return false;
+    const now = currentTicket();
+    const before = {
+      title: draft.ticket.title,
+      description: draft.ticket.description,
+      acceptance_criteria: draft.ticket.acceptance_criteria,
+    };
+    return JSON.stringify(now) !== JSON.stringify(before);
+  }
+
+  function closeReview() {
+    draft = null;
+    el("review").hidden = true;
+    el("title").value = "";
+    el("description").value = "";
+    el("criteria").value = "";
+    el("gaps").replaceChildren();
+  }
+
+  async function generate() {
+    showError("");
+    el("generate").disabled = true;
+    try {
+      const data = await postJson("/api/draft", { text: el("request").value });
+      draft = data;
+      el("title").value = data.ticket.title;
+      el("description").value = data.ticket.description;
+      el("criteria").value = data.ticket.acceptance_criteria.join("\n");
+      renderGaps(data.gaps);
+      el("review").hidden = false;
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      el("generate").disabled = false;
+    }
+  }
+
+  async function approve() {
+    showError("");
+    if (!draft) return;
+    try {
+      await postJson("/api/tickets", {
+        original: draft.original,
+        ticket: currentTicket(),
+        gaps: draft.gaps,
+        edited: isEdited(),
+      });
+      closeReview();
+      await loadTickets();
+    } catch (error) {
+      showError(error.message);
+    }
+  }
+
+  function reject() {
+    showError("");
+    closeReview();
+  }
+
+  function ticketItem(row) {
+    const item = document.createElement("li");
+
+    const title = document.createElement("div");
+    title.className = "ticket-title";
+    title.textContent = row.title;
+    if (row.edited) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = "edited";
+      title.appendChild(badge);
+    }
+    item.appendChild(title);
+
+    const description = document.createElement("div");
+    description.textContent = row.description;
+    item.appendChild(description);
+
+    const criteria = document.createElement("ul");
+    criteria.className = "criteria";
+    for (const criterion of row.acceptance_criteria) {
+      const entry = document.createElement("li");
+      entry.textContent = criterion;
+      criteria.appendChild(entry);
+    }
+    item.appendChild(criteria);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = row.gaps.length + " gap(s) · " + row.created_at;
+    item.appendChild(meta);
+
+    return item;
+  }
+
+  async function loadTickets() {
+    const list = el("tickets");
+    try {
+      const response = await fetch("/api/tickets");
+      if (!response.ok) throw new Error("Request failed");
+      const rows = await response.json();
+      list.replaceChildren();
+      if (rows.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "meta";
+        empty.textContent = "Nothing approved yet.";
+        list.appendChild(empty);
+        return;
+      }
+      for (const row of rows) {
+        list.appendChild(ticketItem(row));
+      }
+    } catch (error) {
+      showError("Could not load approved tickets.");
+    }
+  }
+
+  el("generate").addEventListener("click", generate);
+  el("approve").addEventListener("click", approve);
+  el("reject").addEventListener("click", reject);
+  loadTickets();
+</script>
+</body>
+</html>
