@@ -14,6 +14,8 @@ _INSTRUCTION = (
     "request into a developer ticket in formal, everyday developer English. "
     "Return only JSON with keys: title (one short line), description "
     "(2-3 sentences), acceptance_criteria (2-5 testable statements). "
+    "If a detail is vague but its meaning can be reasonably inferred, include "
+    "your interpretation. If a detail is too vague to interpret, leave it out. "
     "Request: "
 )
 
