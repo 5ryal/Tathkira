@@ -111,8 +111,8 @@ ipython_config.py
 
 # pdm
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide metadata in pyproject.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/#using-version-control
+#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
+#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
 # pdm.lock
 # pdm.toml
 .pdm-python
@@ -120,7 +120,7 @@ ipython_config.py
 
 # pixi
 #   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#   pixi.lock
+# pixi.lock
 #   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
 #   in the .venv directory. It is recommended not to include this directory in version control.
 .pixi/*
