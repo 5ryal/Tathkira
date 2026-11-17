@@ -28,4 +28,8 @@ Non-goals:
 - No agent logic, no UI, no database schema yet.
 
 Acceptance criteria:
-- Given a fresh clone, when I run "pip install -r
+- Given a fresh clone, when I run "pip install -r requirements.txt" then "pytest", then the placeholder test passes.
+- Given the repo, when I search for API keys, then only fake values exist in .env.example.
+
+Output:
+List every file you created and explain each in one line.
